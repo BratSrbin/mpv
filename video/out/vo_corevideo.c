@@ -27,7 +27,6 @@
 #include <IOSurface/IOSurface.h>
 #endif
 
-#include <libavcodec/version.h>
 #include <assert.h>
 
 #include "talloc.h"
@@ -490,12 +489,9 @@ static void iosurface_unbind_texture(struct vo *vo)
     gl->Disable(p->dr.texture_target);
 }
 
-#define IS_LIBAV_FORK (LIBAVCODEC_VERSION_MICRO < 100)
-
 static void extract_texture_from_iosurface(struct vo *vo, struct mp_image *mpi)
 {
     struct priv *p = vo->priv;
-
     // we have to manage memory for the CVPixelBuffer reference to prevent
     // leaking and allow IOSurface reuse inside VDA's surface pool, see
     // `video/decode/vda.c` for the full explaination
@@ -503,11 +499,6 @@ static void extract_texture_from_iosurface(struct vo *vo, struct mp_image *mpi)
     p->dr.pbuf = NULL;
 
     p->dr.pbuf = (CVPixelBufferRef)mpi->planes[3];;
-
-#if !IS_LIBAV_FORK
-    CVPixelBufferRetain(p->dr.pbuf);
-#endif
-
     IOSurfaceRef surface = CVPixelBufferGetIOSurface(p->dr.pbuf);
     MP_DBG(vo, "iosurface id: %d\n", IOSurfaceGetID(surface));
 

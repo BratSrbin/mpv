@@ -150,6 +150,18 @@ static void uninit(struct lavc_ctx *ctx) {
         ff_vda_destroy_decoder(&p->vda_ctx);
 }
 
+
+static struct mp_image *process_image(struct lavc_ctx *ctx, struct mp_image *mpi)
+{
+#if !IS_LIBAV_FORK
+    // check the comment on `use_ref_buffer` above in this file for an
+    // explaination of why this is needed
+    CVPixelBufferRef pbuf = (CVPixelBufferRef)mpi->planes[3];
+    CVPixelBufferRetain(pbuf);
+#endif
+    return mpi;
+}
+
 // This actually returns dummy images, since vda_264 creates it's own AVFrames
 // to wrap CVPixelBuffers in planes[3].
 static struct mp_image *allocate_image(struct lavc_ctx *ctx, int fmt,
@@ -167,13 +179,11 @@ static struct mp_image *allocate_image(struct lavc_ctx *ctx, int fmt,
     mp_image_setfmt(&img, fmt);
     mp_image_set_size(&img, w, h);
 
-    struct mp_image *refcounted_image = mp_image_new_ref(&img);
+    // There is an `assert(!dst->f.buf[0])` in libavcodec/h264.c
+    // Setting the first plane to some dummy value allows to satisfy it
+    img.planes[0] = (void*)"dummy";
 
-    // there is an `assert(!dst->f.buf[0])` in libavcodec/h264.c
-    // setting the first plane to some dummy value allows to satisfy it
-    refcounted_image->planes[0] = (void*)"dummy";
-
-    return refcounted_image;
+    return mp_image_new_custom_ref(&img, NULL, NULL);
 }
 
 const struct vd_lavc_hwdec mp_vd_lavc_vda = {
@@ -183,4 +193,5 @@ const struct vd_lavc_hwdec mp_vd_lavc_vda = {
     .init = init,
     .uninit = uninit,
     .allocate_image = allocate_image,
+    .process_image = process_image,
 };
